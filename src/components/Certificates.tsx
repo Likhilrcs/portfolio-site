@@ -5,31 +5,31 @@ const certificates = [
     title: "Software Engineering",
     issuer: "Forage - Accenture",
     date: "July 2025",
-    image: ".../public/certificates/Accenture.jpg", // store inside /public/certificates/
+    image: "../public/Accenture.jpg", // store inside /public/certificates/
   },
   { 
     title: "Solutions Architect",
     issuer: "Forage - AWS",
     date: "July 2025",
-    image: "../public/certificates/AWS.jpg",
+    image: "../public/AWS.jpg",
   },
   {
     title: "Data Analyst",
     issuer: "Deloitte",
     date: "July 2025",
-    image: "../public/certificates/Deloitte.jpg",
+    image: "../public/Deloitte.jpg",
   },
   {
     title: "Frontend Development",
     issuer: "simplilearn",
     date: "July 2025",
-    image: "../public/certificates/FrontEnd.jpg", // store inside /public/certificates/
+    image: "../public/FrontEnd.jpg", // store inside /public/certificates/
   },
   {
     title: "Prompt Engineer",
     issuer: "simplilearn - Microsoft",
     date: "Aug 2025",
-    image: "../public/certificates/prompt Enginner.jpg", // store inside /public/certificates/
+    image: "../public/prompt Enginner.jpg", // store inside /public/certificates/
   },
 ]
 
