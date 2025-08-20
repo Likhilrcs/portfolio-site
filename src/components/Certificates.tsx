@@ -5,7 +5,7 @@ const certificates = [
     title: "Software Engineering",
     issuer: "Forage - Accenture",
     date: "July 2025",
-    image: "../public/Accenture.jpg", // store inside /public/certificates/
+    image: "../src/assets/Accenture.jpg", // store inside /public/certificates/
   },
   { 
     title: "Solutions Architect",
