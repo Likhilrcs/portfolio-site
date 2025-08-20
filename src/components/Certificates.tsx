@@ -1,44 +1,44 @@
 import { Card, CardContent } from "@/components/ui/card"
 
-const certificates = [
-  {
-    title: "Software Engineering",
-    issuer: "Forage - Accenture",
-    date: "July 2025",
-    image: "../src/assets/Accenture.jpg", // store inside /public/certificates/
-  },
-  { 
-    title: "Solutions Architect",
-    issuer: "Forage - AWS",
-    date: "July 2025",
-    image: "../public/AWS.jpg",
-  },
-  {
-    title: "Data Analyst",
-    issuer: "Deloitte",
-    date: "July 2025",
-    image: "../public/Deloitte.jpg",
-  },
-  {
-    title: "Frontend Development",
-    issuer: "simplilearn",
-    date: "July 2025",
-    image: "../public/FrontEnd.jpg", // store inside /public/certificates/
-  },
-  {
-    title: "Prompt Engineer",
-    issuer: "simplilearn - Microsoft",
-    date: "Aug 2025",
-    image: "../public/prompt Enginner.jpg", // store inside /public/certificates/
-  },
-]
+const Certificates = () => {
+  const certificate = [
+    {
+      title: "Software Engineering",
+      issuer: "Forage - Accenture",
+      date: "July 2025",
+      image: "../src/assets/Accenture.jpg", // store inside /public/certificates/
+    },
+    { 
+      title: "Solutions Architect",
+      issuer: "Forage - AWS",
+      date: "July 2025",
+      image: "../public/AWS.jpg",
+    },
+    {
+      title: "Data Analyst",
+      issuer: "Deloitte",
+      date: "July 2025",
+      image: "../public/Deloitte.jpg",
+    },
+    {
+      title: "Frontend Development",
+      issuer: "simplilearn",
+      date: "July 2025",
+      image: "../public/FrontEnd.jpg", // store inside /public/certificates/
+    },
+    {
+      title: "Prompt Engineer",
+      issuer: "simplilearn - Microsoft",
+      date: "Aug 2025",
+      image: "../public/prompt Enginner.jpg", // store inside /public/certificates/
+    },
+  ]
 
-export default function Certificates() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-3xl font-bold mb-6 text-center">My Certificates</h1>
       <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-2 gap-7">
-        {certificates.map((cert, index) => (
+        {certificate.map((cert, index) => (
           <Card key={index} className="shadow-lg rounded-2xl">
             <CardContent className="p-4">
               <img
@@ -56,3 +56,5 @@ export default function Certificates() {
     </div>
   )
 }
+
+export default Certificates;
