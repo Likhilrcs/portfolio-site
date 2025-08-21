@@ -68,19 +68,14 @@
   }
 
   // Move virtual cursor to a landmark (index tip)
-  // Move virtual cursor to a landmark (index tip)
-function moveCursorFrom(lm) {
-  // Flip the X axis so right = right
-  const flippedX = (1 - lm[8].x) * window.innerWidth;
-  const y = lm[8].y * window.innerHeight;
-
-  cursor.style.left = `${flippedX}px`;
-  cursor.style.top  = `${y}px`;
-  cursor.style.display = 'block';
-
-  return { x: flippedX, y };
-}
-
+  function moveCursorFrom(lm) {
+    const x = lm[8].x * window.innerWidth;
+    const y = lm[8].y * window.innerHeight;
+    cursor.style.left = `${x}px`;
+    cursor.style.top  = `${y}px`;
+    cursor.style.display = 'block';
+    return {x, y};
+  }
 
   // Simulate click at a screen point
   function clickAt(x, y) {
