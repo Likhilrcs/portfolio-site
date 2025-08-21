@@ -6,19 +6,19 @@ const Certificates = () => {
       title: "Software Engineering",
       issuer: "Forage - Accenture",
       date: "July 2025",
-      image: "../public/Accenture.jpg", // store inside /public/certificates/
+      image: "/Accenture.jpg", // store inside /public/certificates/
     },
     { 
       title: "Solutions Architect",
       issuer: "Forage - AWS",
       date: "July 2025",
-      image: "../public/AWS.jpg",
+      image: "/AWS.jpg",
     },
     {
       title: "Data Analyst",
       issuer: "Deloitte",
       date: "July 2025",
-      image: "../public/Deloitte.jpg",
+      image: "/Deloitte.jpg",
     },
     {
       title: "Frontend Development",
