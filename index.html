@@ -6,195 +6,214 @@
     <title>Likhil Bachanaboina - Developer</title>
     
     <link rel="icon" href="/public/favicon.png" />
+    <style>
+      #webcam, #output {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  transform: scaleX(-1); /* mirror effect */
+}
+
+#cursor {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: red;
+  border-radius: 50%;
+  pointer-events: none;
+  display: none;
+}
+
+    </style>
   </head>
 
   <body>
     <div id="root"></div>
-    <!-- Toggle UI -->
-<button id="handToggle" style="position:fixed;right:16px;bottom:16px;z-index:9999">
+   
+     <!-- ===== Hand Control Elements (paste before </body>) ===== -->
+<button id="handToggle" style="position:fixed;right:16px;bottom:16px;z-index:9999;">
   ✋ Enable Hand Control
 </button>
 
-<!-- Hidden webcam feed -->
-<video id="cam" playsinline style="display:none;"></video>
+<video id="cam" playsinline autoplay style="display:none;"></video>
 
-<!-- Overlay for drawings + virtual cursor -->
 <canvas id="overlay" style="
   position:fixed;left:0;top:0;width:100vw;height:100vh;
   pointer-events:none;z-index:9998;"></canvas>
+
 <div id="cursor" style="
   position:fixed;left:0;top:0;width:18px;height:18px;border-radius:50%;
-  border:2px solid #00e5ff;background:rgba(0,229,255,.15);
+  border:2px solid #00e5ff;background:rgba(0,229,255,.12);
   transform:translate(-50%,-50%);pointer-events:none;z-index:9999;display:none;"></div>
+
+<style>
+  /* highlight element under hand */
+  .hand-hover {
+    transition: box-shadow .12s, transform .12s;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    transform: translateY(-4px);
+  }
+  /* click ripple */
+  .hand-ripple {
+    position: absolute;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(0,229,255,0.55);
+    transform: translate(-50%,-50%) scale(0.3);
+    pointer-events: none;
+    animation: ripple 420ms ease-out forwards;
+    z-index: 10000;
+  }
+  @keyframes ripple {
+    to { transform: translate(-50%,-50%) scale(4); opacity: 0; }
+  }
+</style>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
 <script>
 (() => {
+  // UI elements
+  const toggleBtn = document.getElementById('handToggle');
   const video = document.getElementById('cam');
   const canvas = document.getElementById('overlay');
   const ctx = canvas.getContext('2d');
   const cursor = document.getElementById('cursor');
-  const toggleBtn = document.getElementById('handToggle');
 
+  // state
+  let camera = null;
+  let hands = null;
   let enabled = false;
-  let cam, hands;
-  let lastPinchClickAt = 0;
-  let lastSwipeAt = 0;
-  let lastPalmXs = [];             // for swipe detection
-  let usingCursor = false;
+  let lastZ = null;
+  let lastClickAt = 0;
+  const CLICK_COOLDOWN = 600; // ms
+  const POKE_THRESHOLD = 0.04; // tune this if too sensitive
+  const SMOOTH_ALPHA = 0.35; // exponential smoothing for z
 
-  // Resize canvas to viewport
   function fitCanvas() {
-    canvas.width  = window.innerWidth;
+    canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
   fitCanvas();
   window.addEventListener('resize', fitCanvas);
 
-  // Utilities
-  const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
-  const now  = () => performance.now();
-
-  // Basic finger-up check (tip above PIP in image coords)
-  function fingersUp(lm) {
-    const up = [false,false,false,false,false];
-    // tips: 4,8,12,16,20 ; pip joints: 3,6,10,14,18
-    // Thumb is special (x check), others use y
-    up[0] = (lm[4].x < lm[3].x); // works best for right hand; good enough for demo
-    up[1] = (lm[8].y < lm[6].y);
-    up[2] = (lm[12].y < lm[10].y);
-    up[3] = (lm[16].y < lm[14].y);
-    up[4] = (lm[20].y < lm[18].y);
-    return up;
+  // helper to convert normalized coords to page pixels
+  function pagePosFromNorm(normX, normY) {
+    // NOTE: we mirror X in JS so that moving hand to right moves cursor right (keeps video mirrored)
+    const x = (1 - normX) * window.innerWidth;
+    const y = normY * window.innerHeight;
+    return { x, y };
   }
 
-  // Move virtual cursor to a landmark (index tip)
+  // move cursor using middle finger (landmark 12)
   function moveCursorFrom(lm) {
-    const x = lm[8].x * window.innerWidth;
-    const y = lm[8].y * window.innerHeight;
-    cursor.style.left = `${x}px`;
-    cursor.style.top  = `${y}px`;
+    const pos = pagePosFromNorm(lm[12].x, lm[12].y);
+    cursor.style.left = pos.x + 'px';
+    cursor.style.top  = pos.y + 'px';
     cursor.style.display = 'block';
-    return {x, y};
+    return pos;
   }
 
-  // Simulate click at a screen point
-  function clickAt(x, y) {
-    const el = document.elementFromPoint(x, y);
-    if (el && typeof el.click === 'function') {
-      el.click();
-      // quick flash on cursor
-      cursor.style.borderColor = '#fff';
-      setTimeout(()=>cursor.style.borderColor='#00e5ff',120);
-    }
-  }
-
-  // Smooth scroll helper (avoid jitter)
-  let scrollCooldown = 0;
-  function smoothScrollBy(y) {
-    const t = now();
-    if (t - scrollCooldown < 120) return;
-    scrollCooldown = t;
-    window.scrollBy({ top: y, behavior: 'smooth' });
-  }
-
-  // Section navigation (swipe)
-  function onSwipe(direction) {
-    const t = now();
-    if (t - lastSwipeAt < 800) return; // throttle
-    lastSwipeAt = t;
-
-    // Try to paginate between full-screen sections
-    const sections = Array.from(document.querySelectorAll('section, .section, [data-section]'));
-    if (sections.length) {
-      // find current section midpoint
-      const mid = window.scrollY + window.innerHeight/2;
-      const curIdx = sections.findIndex(s => {
-        const r = s.getBoundingClientRect();
-        const top = r.top + window.scrollY;
-        const bottom = top + r.height;
-        return mid >= top && mid < bottom;
-      });
-      let nextIdx = curIdx;
-      if (direction === 'left')  nextIdx = Math.min(sections.length-1, curIdx+1);
-      if (direction === 'right') nextIdx = Math.max(0, curIdx-1);
-      if (nextIdx !== curIdx && nextIdx >= 0) {
-        sections[nextIdx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // highlight element under cursor
+  let lastHoverEl = null;
+  function updateHover(pos) {
+    const el = document.elementFromPoint(pos.x, pos.y);
+    if (el !== lastHoverEl) {
+      if (lastHoverEl) lastHoverEl.classList.remove('hand-hover');
+      if (el && el !== document.body && el !== document.documentElement) {
+        el.classList.add('hand-hover');
+        lastHoverEl = el;
+      } else {
+        lastHoverEl = null;
       }
-    } else {
-      // fallback: page up/down
-      window.scrollBy({ top: direction === 'left' ? window.innerHeight : -window.innerHeight, behavior: 'smooth' });
     }
   }
 
-  function onResults(res) {
+  // ripple effect for click
+  function showRipple(x, y) {
+    const r = document.createElement('div');
+    r.className = 'hand-ripple';
+    r.style.left = x + 'px';
+    r.style.top  = y + 'px';
+    document.body.appendChild(r);
+    setTimeout(()=> r.remove(), 600);
+  }
+
+  // perform click (debounced)
+  function doClick(pos) {
+    const now = performance.now();
+    if (now - lastClickAt < CLICK_COOLDOWN) return;
+    lastClickAt = now;
+
+    const el = document.elementFromPoint(pos.x, pos.y);
+    if (!el) return;
+    showRipple(pos.x, pos.y);
+
+    // if it's a link or button, call click
+    if (typeof el.click === 'function') {
+      el.click();
+    } else {
+      // otherwise dispatch a synthetic pointer event (for elements that listen to pointerdown)
+      const evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+      el.dispatchEvent(evt);
+    }
+  }
+
+  // poke detector using middle finger Z (lm[12].z)
+  let smoothedZ = null;
+  function detectPoke(lm) {
+    const z = lm[12].z;
+    if (smoothedZ === null) smoothedZ = z;
+    smoothedZ = smoothedZ * (1 - SMOOTH_ALPHA) + z * SMOOTH_ALPHA;
+
+    // poke if smoothed previous - current > threshold
+    const delta = (lastZ === null) ? 0 : (lastZ - smoothedZ);
+    lastZ = smoothedZ;
+    return delta > POKE_THRESHOLD;
+  }
+
+  // handle new results from MediaPipe
+  function onResults(results) {
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    if (!res.multiHandLandmarks || res.multiHandLandmarks.length === 0) {
-      cursor.style.display = usingCursor ? 'block' : 'none';
+
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      cursor.style.display = 'none';
+      if (lastHoverEl) { lastHoverEl.classList.remove('hand-hover'); lastHoverEl = null; }
       return;
     }
 
-    const lm = res.multiHandLandmarks[0];
+    // take first hand only
+    const lm = results.multiHandLandmarks[0];
 
-    // Draw a subtle portal ring at palm center (wrist idx=0)
-    const wrist = lm[0];
-    const px = wrist.x * canvas.width;
-    const py = wrist.y * canvas.height;
-    const portalR = 28 + (Math.sin(performance.now()/180)*6);
-    const grad = ctx.createRadialGradient(px, py, portalR*0.2, px, py, portalR);
-    grad.addColorStop(0, 'rgba(0,229,255,0.5)');
-    grad.addColorStop(1, 'rgba(0,229,255,0.0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(px, py, portalR, 0, Math.PI*2); ctx.fill();
+    // draw a subtle ring at the palm for visual effect
+    const palmX = lm[0].x * canvas.width;
+    const palmY = lm[0].y * canvas.height;
+    const r = 26;
+    const g = ctx.createRadialGradient(palmX, palmY, r*0.25, palmX, palmY, r);
+    g.addColorStop(0, 'rgba(0,229,255,0.45)');
+    g.addColorStop(1, 'rgba(0,229,255,0.0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(palmX, palmY, r, 0, Math.PI*2); ctx.fill();
 
-    // Gesture primitives
-    const up = fingersUp(lm);
-    const openCount = up.filter(Boolean).length;
-    const pinch = dist(lm[4], lm[8]); // thumb–index
-    const indexTip = lm[8];
+    // move cursor (middle finger)
+    const pos = moveCursorFrom(lm);
 
-    // Swipe detection from wrist.x velocity
-    lastPalmXs.push(wrist.x);
-    if (lastPalmXs.length > 6) lastPalmXs.shift();
-    if (lastPalmXs.length === 6) {
-      const dx = lastPalmXs[0] - lastPalmXs[5];
-      if (Math.abs(dx) > 0.12) {
-        onSwipe(dx > 0 ? 'right' : 'left');
-        lastPalmXs = []; // reset after swipe
-      }
-    }
+    // update hover highlight
+    updateHover(pos);
 
-    // Map to actions
-    // 1) Open palm (>=4 fingers up) → scroll down slowly
-    if (openCount >= 4) {
-      smoothScrollBy(90);
-    } else if (openCount === 0) {
-      // closed fist → scroll up slowly
-      smoothScrollBy(-90);
-    }
-
-    // 2) Pointing (index up, others mostly down) → show cursor and move
-    if (up[1] && !up[2] && !up[3]) {
-      usingCursor = true;
-      const {x, y} = moveCursorFrom(lm);
-      // optional hover highlight could be added here
-    } else {
-      usingCursor = false;
-    }
-
-    // 3) Pinch to click (thumb-index distance small for >200ms)
-    if (pinch < 0.035 && usingCursor) {
-      const t = now();
-      if (t - lastPinchClickAt > 400) {
-        lastPinchClickAt = t;
-        const rect = cursor.getBoundingClientRect();
-        clickAt(rect.left + rect.width/2, rect.top + rect.height/2);
-      }
+    // detect poke-forward click
+    if (detectPoke(lm)) {
+      doClick(pos);
     }
   }
 
-  async function start() {
-    // HTTPS or localhost is required for camera
-    hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  // start the camera + mediapipe
+  async function startHands() {
+    hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
     hands.setOptions({
       maxNumHands: 1,
       modelComplexity: 1,
@@ -203,35 +222,44 @@
     });
     hands.onResults(onResults);
 
-    cam = new Camera(video, {
+    camera = new Camera(video, {
       onFrame: async () => { await hands.send({ image: video }); },
-      width:  640,
+      width: 640,
       height: 480
     });
-    await cam.start();
+
+    await camera.start();
     enabled = true;
     toggleBtn.textContent = '✋ Hand Control: ON';
   }
 
-  function stop() {
-    if (cam && cam.stop) cam.stop();
+  function stopHands() {
+    try { camera?.stop?.(); } catch(e) {}
     enabled = false;
     toggleBtn.textContent = '✋ Enable Hand Control';
     cursor.style.display = 'none';
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    if (lastHoverEl) { lastHoverEl.classList.remove('hand-hover'); lastHoverEl = null; }
+    smoothedZ = null; lastZ = null;
   }
 
+  // toggle via button (good for mobile browsers that require user gesture)
   toggleBtn.addEventListener('click', async () => {
     if (!enabled) {
-      try { await start(); }
-      catch (e) {
-        alert('Camera permission denied or not available.');
-        console.error(e);
+      try {
+        await startHands();
+      } catch (err) {
+        alert('Camera permission denied or not available. Open page via HTTPS or localhost and allow camera.');
+        console.error(err);
       }
     } else {
-      stop();
+      stopHands();
     }
   });
+
+  // auto-start if you want (comment out if not)
+  // startHands();
+
 })();
 </script>
 

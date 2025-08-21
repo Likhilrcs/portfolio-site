@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 import { Download, MapPin, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Certificates from "../components/Certificates";
+import Certificate from "../components/Certificates";
 
 
 
@@ -67,7 +67,7 @@ const Resume = () => {
                 <CardTitle>Certificates</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Certificates />
+                <Certificate />
               </CardContent>
             </Card>
 

@@ -6,7 +6,7 @@ const Certificates = () => {
       title: "Software Engineering",
       issuer: "Forage - Accenture",
       date: "July 2025",
-      image: "../assets/Accenture.jpg", // store inside /public/certificates/
+      image: "../public/Accenture.jpg", // store inside /public/certificates/
     },
     { 
       title: "Solutions Architect",
@@ -24,13 +24,13 @@ const Certificates = () => {
       title: "Frontend Development",
       issuer: "simplilearn",
       date: "July 2025",
-      image: "../public/FrontEnd.jpg", // store inside /public/certificates/
+      image: "/FrontEnd.jpg", // store inside /public/certificates/
     },
     {
       title: "Prompt Engineer",
       issuer: "simplilearn - Microsoft",
       date: "Aug 2025",
-      image: "../public/prompt Enginner.jpg", // store inside /public/certificates/
+      image: "/prompt Enginner.jpg", // store inside /public/certificates/
     },
   ]
 
